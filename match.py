@@ -101,7 +101,7 @@ class Person(object):
     @property
     def time_at_lyft(self):
         start_date = dateutil.parser.parse(self.family.get('start_date', '')).replace(tzinfo=None)
-        rd = dateutil.relativedelta.relativedelta(datetime.datetime.now(), start_date)
+        rd = relativedelta(datetime.datetime.now(), start_date)
         return rd
 
     @property
@@ -163,16 +163,16 @@ def read_emails(filename):
         return [line.strip(' \r\n') for line in f.readlines()]
 
 
-def select(persons, emails):
-    selected = []
-    nonselected = []
+def sponsor(persons, emails):
+    sponsored = []
+    nonsponsored = []
     emails = set(emails)
     for p in persons:
         if p.email in emails:
-            selected.append(p)
+            sponsored.append(p)
         else:
-            nonselected.append(p)
-    return nonselected + list(reversed(selected))
+            nonsponsored.append(p)
+    return nonsponsored + list(reversed(sponsored))
 
 
 def read_family(filename):
@@ -200,10 +200,10 @@ if __name__ == '__main__':
     random.shuffle(mentors)
     random.shuffle(mentees)
 
-    selected_mentors = read_emails('mentors.txt')
-    selected_mentees = read_emails('mentees.txt')
-    mentors = select(mentors, selected_mentors)
-    mentees = select(mentees, selected_mentees)
+    sponsored_mentors = read_emails('mentors.txt')
+    sponsored_mentees = read_emails('mentees.txt')
+    mentors = sponsor(mentors, sponsored_mentors)
+    mentees = sponsor(mentees, sponsored_mentees)
 
     matches = []
     while len(mentors) > 0:
