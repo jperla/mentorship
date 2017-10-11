@@ -23,7 +23,13 @@ COL_CAN_MENTOR_SKILLS = 10
 
 
 def filter_city(persons, city):
-    return [p for p in persons if p.city == city]
+    # hack for people who didn't update survey, assume SF
+    return [p for p in persons if (p.city == city or (city == 'SF' and p.city == ''))]
+
+
+def filter_office(persons, office):
+    office = 'San Francisco' if office == 'SF' else office
+    return [p for p in persons if p.office == office]
 
 
 def filter_titles(persons):
@@ -65,7 +71,15 @@ def filter_mentees(rows, orgchart, city):
     return mentees
 
 
-def make_match(mentor, mentees):
+def make_match(mentor, mentee):
+    match = (mentor, mentee,
+             ', '.join(mentor.skills_to_mentor(mentee)),
+             mentor.manager_delta(mentee),
+             mentor.cosine_similarity_skills_match_with(mentee))
+    return match
+
+
+def match_algorithm(mentor, mentees):
     """Accepts a mentor, and a list of possible matches.
        Returns a 2-tuple of
            1. the match (3-tuple of mentor, mentee, skills list) and
@@ -75,10 +89,7 @@ def make_match(mentor, mentees):
     # TODO: use more logic: e.g. increase cross-org matches
     for i, mentee in enumerate(mentees):
         if mentor.is_skills_match_with(mentee) and mentor.manager_delta(mentee) > 2:
-            match = (mentor, mentee,
-                     mentor.skills_to_mentor(mentee),
-                     mentor.manager_delta(mentee),
-                     mentor.cosine_similarity_skills_match_with(mentee))
+            match = make_match(mentor, mentee)
             remaining_mentees = [m for m in mentees if m != mentee]
             return (match, remaining_mentees)
     else:
@@ -117,7 +128,13 @@ class Person(object):
 
     @property
     def city(self):
+        """Self reported city in the survey"""
         return self._row[2]
+
+    @property
+    def office(self):
+        """Office in TOM"""
+        return self.json.get('office_location', '')
 
     @property
     def title(self):
@@ -142,6 +159,10 @@ class Person(object):
     def time_at_lyft_str(self):
         rd = self.time_at_lyft
         return "%dy %dm" % (rd.years, rd.months)
+
+    def skills_interests(self):
+        skills = self._parse_skills_str_in_row(COL_WANT_SKILLS)
+        return skills
 
     @property
     def json(self):
@@ -192,8 +213,7 @@ class Mentee(Person):
         Person.__init__(self, row, orgchart=orgchart)
 
     def mentee_skills_interests(self):
-        skills = self._parse_skills_str_in_row(COL_WANT_SKILLS)
-        return skills
+        return self.skills_interests()
 
 
 class OrgChart(object):
@@ -241,7 +261,7 @@ def sponsor(persons, emails):
     return sponsored + nonsponsored
 
 
-def remove_mentor_from_mentees_list(mentor, mentees):
+def remove_person_from_list(mentor, mentees):
     return [m for m in mentees if m.email != mentor.email]
 
 
@@ -281,20 +301,54 @@ if __name__ == '__main__':
     mentors = list(reversed(sponsor(mentors, sponsored_mentors)))  # pop from bottom
     mentees = sponsor(mentees, sponsored_mentees)
 
+    """
+    print 'Mentees interested in ML:'
+    for m in mentees:
+        if 'Machine Learning' in m.skills_interests():
+            print m.email
+    for m in mentors:
+        if 'Machine Learning' in m.skills_interests():
+            print m.email
+    """
+
+
     matches = []
+
+    # sponsored matches
+    with open('matches.txt', 'r') as f:
+        for line in f.readlines():
+            mentor_email, mentee_email = line.strip(' \r\n').split(',')
+            maybe_mentor = [m for m in mentors if m.email == mentor_email]
+            if len(maybe_mentor) > 0:
+                mentor = maybe_mentor[0]
+                # otherwise, assume wrong city
+                mentee = None
+                maybe_mentee = [m for m in mentees if m.email == mentee_email]
+                if len(maybe_mentee) > 0:
+                    mentee = maybe_mentee[0]
+                else:
+                    # if a mentee was sponsored but didn't say mentee on survey
+                    q = [m for m in mentors if m.email == mentee_email][0]
+                    mentee = Mentee(q.row, orgchart)
+
+                matches.append(make_match(mentor, mentee))
+                mentors = remove_person_from_list(mentor, mentors)
+                mentees = remove_person_from_list(mentor, mentees)
+                mentees = remove_person_from_list(mentee, mentees)
+
     while len(mentors) > 0:
         mentor_to_match = mentors.pop()
-        match, mentees = make_match(mentor_to_match, mentees)
+        match, mentees = match_algorithm(mentor_to_match, mentees)
         if match is not None:
             matches.append(match)
-            mentees = remove_mentor_from_mentees_list(match[0], mentees)
+            mentees = remove_person_from_list(match[0], mentees)
         else:
             print 'No mentees found for %s' % mentor_to_match
 
     for m in matches:
         print m
     
-    print "\n\nManager Emails:"
+    print "\n\nMentor Emails:"
     print ','.join(m[0].email for m in matches)
 
     print "\n\nRemaining mentees with no mentors:"
