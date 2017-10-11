@@ -1,9 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import csv
 import sys
 import random
 import json
 import datetime
+
+from scipy import spatial
 import dateutil.parser
 from dateutil.relativedelta import relativedelta
 
@@ -76,7 +78,9 @@ def make_match(mentor, mentees):
     # TODO: use more logic: e.g. increase cross-org matches
     for i, mentee in enumerate(mentees):
         if mentor.is_skills_match_with(mentee):
-            match = (mentor, mentee, mentor.skills_to_mentor(mentee))
+            match = (mentor, mentee,
+                     mentor.skills_to_mentor(mentee),
+                     mentor.cosine_similarity_skills_match_with(mentee))
             remaining_mentees = [m for m in mentees if m != mentee]
             return (match, remaining_mentees)
     else:
@@ -84,6 +88,8 @@ def make_match(mentor, mentees):
 
 
 class Person(object):
+    skills = []
+
     def __init__(self, row, family=None):
         self._row = row
         self._family = family
@@ -136,6 +142,9 @@ class Person(object):
     def __repr__(self):
         return self.__str__()
 
+    @classmethod
+    def _vectorize_skills(cls, skills_to_vectorize):
+        return [(1 if s in skills_to_vectorize else 0) for s in cls.skills]
 
 class Mentor(Person):
     def __init__(self, person):
@@ -145,6 +154,11 @@ class Mentor(Person):
         # TODO: add in most-wanted skill logic from mentee when we have that data
         if len(self.skills_to_mentor(mentee)) > 0:
             return True
+
+    def cosine_similarity_skills_match_with(self, mentee):
+        mentor_skills = Person._vectorize_skills(self.mentorable_skills())
+        mentee_skills = Person._vectorize_skills(mentee.mentee_skills_interests())
+        return round(spatial.distance.cosine(mentor_skills, mentee_skills), 2)
 
     def skills_to_mentor(self, mentee):
         return self.mentorable_skills().intersection(mentee.mentee_skills_interests())
@@ -192,6 +206,16 @@ def read_family(filename):
 def remove_mentor_from_mentees_list(mentor, mentees):
     return [m for m in mentees if m.email != mentor.email]
 
+
+def find_all_skills(mentors, mentees):
+    skills = set()
+    for mentor in mentors:
+        skills.update(set(mentor.mentorable_skills()))
+    for mentee in mentees:
+        skills.update(set(mentee.mentee_skills_interests()))
+    return list(sorted(skills))
+
+
 if __name__ == '__main__':
     family = read_family('all.txt')
 
@@ -206,6 +230,8 @@ if __name__ == '__main__':
         people = [Person(row, family=family.get(row[1])) for row in data]
 
     mentors, mentees = filter_mentors(people, city), filter_mentees(people, city)
+
+    Person.skills = find_all_skills(mentors, mentees)
 
     random.shuffle(mentors)
     random.shuffle(mentees)
@@ -229,5 +255,6 @@ if __name__ == '__main__':
         print m
 
     print 'Remaining mentees with no mentors:'
+
     for m in mentees:
         print m
