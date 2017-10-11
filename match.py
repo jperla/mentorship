@@ -24,14 +24,10 @@ COL_CAN_MENTOR_SKILLS = 10
 
 def filter_city(persons, city):
     # hack for people who didn't update survey, assume SF
-    return [p for p in persons if (p.city == city or 
-                                   (city == 'SF' and p.office == 'San Francisco') or
-                                   (city == 'Seattle' and p.office == 'Seattle') or
-                                   (city == 'SF' and p.city == '' and p.office == ''))]
+    return [p for p in persons if p.office == city]
 
 
 def filter_office(persons, office):
-    office = 'San Francisco' if office == 'SF' else office
     return [p for p in persons if p.office == office]
 
 
@@ -137,7 +133,15 @@ class Person(object):
     @property
     def office(self):
         """Office in TOM"""
-        return self.json.get('office_location', '')
+        o = self.json.get('office', '')
+        if o == '56c9058543dd7515dcaf17a7':
+            return 'Seattle'
+        elif o == '5801363843dd750335385593':
+            return 'SF'
+        elif o == '59a7731643dd75614c9998db':
+            return 'Palo Alto'
+        else:
+            return ''
 
     @property
     def title(self):
