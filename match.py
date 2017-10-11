@@ -74,9 +74,10 @@ def make_match(mentor, mentees):
     # TODO: this is greedy; can we optimize an objective function instead?
     # TODO: use more logic: e.g. increase cross-org matches
     for i, mentee in enumerate(mentees):
-        if mentor.is_skills_match_with(mentee):
+        if mentor.is_skills_match_with(mentee) and mentor.manager_delta(mentee) > 2:
             match = (mentor, mentee,
                      mentor.skills_to_mentor(mentee),
+                     mentor.manager_delta(mentee),
                      mentor.cosine_similarity_skills_match_with(mentee))
             remaining_mentees = [m for m in mentees if m != mentee]
             return (match, remaining_mentees)
@@ -89,8 +90,22 @@ class Person(object):
 
     def __init__(self, row, orgchart=None):
         self._row = row
+        self._managers = []
         if orgchart:
-            self._json = orgchart.get(row[COL_EMAIL], None)
+            self._json = orgchart.get_by_email(row[COL_EMAIL])
+
+            json = self._json
+            while json and 'manager' in json:
+                json = orgchart.get_by_id(json['manager'])
+                self._managers.append(json)
+
+    def manager_delta(self, other):
+        my_managers = set([m['email'] for m in self.managers])
+        other_managers = set([m['email'] for m in other.managers])
+        if self.email in other_managers or other.email in my_managers:
+            return 0
+        else:
+            return len(my_managers.symmetric_difference(other_managers))
 
     @property
     def email(self):
@@ -107,6 +122,10 @@ class Person(object):
     @property
     def title(self):
         return self.json.get('title', 'Not in orgchart')
+
+    @property
+    def managers(self):
+        return self._managers
 
     @property
     def time_at_lyft(self):
@@ -177,6 +196,34 @@ class Mentee(Person):
         return skills
 
 
+class OrgChart(object):
+    def __init__(self, list_of_dicts):
+        self._email_index = OrgChart._index(list_of_dicts, 'email')
+        self._id_index = OrgChart._index(list_of_dicts, '_id')
+
+    def get_by_email(self, email):
+        return self._email_index.get(email, None)
+
+    def get_by_id(self, id):
+        return self._id_index.get(id, None)
+
+    @classmethod
+    def _index(cls, list_of_dicts, field):
+        index = {}
+        for dict in list_of_dicts:
+            index[dict[field]] = dict
+        return index
+
+    @classmethod
+    def readfile(cls, filename):
+        list_of_dicts = []
+        with open(filename, 'r') as f:
+            for line in f:
+                p = json.loads(line)
+                list_of_dicts.append(p)
+        return OrgChart(list_of_dicts)
+
+
 def read_emails(filename):
     with open(filename, 'r') as f:
         return [line.strip(' \r\n') for line in f.readlines()]
@@ -194,15 +241,6 @@ def sponsor(persons, emails):
     return sponsored + nonsponsored
 
 
-def read_orgchart(filename):
-    orgchart = {}
-    with open(filename, 'r') as f:
-        for line in f:
-            p = json.loads(line)
-            orgchart[p['email'].lower()] = p
-    return orgchart
-
-
 def remove_mentor_from_mentees_list(mentor, mentees):
     return [m for m in mentees if m.email != mentor.email]
 
@@ -217,7 +255,7 @@ def find_all_skills(mentors, mentees):
 
 
 if __name__ == '__main__':
-    orgchart = read_orgchart('all.txt')
+    orgchart = OrgChart.readfile('all.txt')
 
     city = sys.argv[1]
 
@@ -237,7 +275,7 @@ if __name__ == '__main__':
 
     sponsored_mentors = read_emails('mentors.txt')
     sponsored_mentees = read_emails('mentees.txt')
-    mentors = list(reversed(sponsor(mentors, sponsored_mentors))) # pop from bottom
+    mentors = list(reversed(sponsor(mentors, sponsored_mentors)))  # pop from bottom
     mentees = sponsor(mentees, sponsored_mentees)
 
     matches = []
