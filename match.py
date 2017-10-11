@@ -118,7 +118,7 @@ class Person(object):
     @property
     def time_at_lyft_str(self):
         rd = self.time_at_lyft
-        return "%d years, %d months" % (rd.years, rd.months)
+        return "%dy %dm" % (rd.years, rd.months)
 
     @property
     def family(self):
@@ -131,7 +131,7 @@ class Person(object):
         return skills
 
     def __str__(self):
-        return '{0} ({1}, {3}, {2})'.format(self.email, self.title, self.time_at_lyft_str, self.is_new_employee)
+        return '{0} ({1}, {2})'.format(self.email, self.title, self.time_at_lyft_str)
 
     def __repr__(self):
         return self.__str__()
@@ -178,7 +178,7 @@ def sponsor(persons, emails):
             sponsored.append(p)
         else:
             nonsponsored.append(p)
-    return nonsponsored + list(reversed(sponsored))
+    return sponsored + nonsponsored
 
 
 def read_family(filename):
@@ -189,6 +189,8 @@ def read_family(filename):
             family[p['email'].lower()] = p
     return family
 
+def remove_mentor_from_mentees_list(mentor, mentees):
+    return [m for m in mentees if m.email != mentor.email]
 
 if __name__ == '__main__':
     family = read_family('all.txt')
@@ -210,7 +212,7 @@ if __name__ == '__main__':
 
     sponsored_mentors = read_emails('mentors.txt')
     sponsored_mentees = read_emails('mentees.txt')
-    mentors = sponsor(mentors, sponsored_mentors)
+    mentors = list(reversed(sponsor(mentors, sponsored_mentors)))
     mentees = sponsor(mentees, sponsored_mentees)
 
     matches = []
@@ -219,8 +221,13 @@ if __name__ == '__main__':
         match, mentees = make_match(mentor_to_match, mentees)
         if match is not None:
             matches.append(match)
+            mentees = remove_mentor_from_mentees_list(match[0], mentees)
         else:
             print 'No mentees found for %s' % mentor_to_match
 
     for m in matches:
+        print m
+
+    print 'Remaining mentees with no mentors:'
+    for m in mentees:
         print m
