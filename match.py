@@ -35,33 +35,30 @@ def filter_out_new_employees(persons):
     return [p for p in persons if not p.is_new_employee]
 
 
-def filter_mentors(people, city):
+def filter_mentors(rows, orgchart, city):
     """Accepts a list of all people who filled out form.
       Returns a list of potential mentors after filtering
         out those who don't want to or don't have skills to.
     """
     # TODO: write more of this (like filter out non-complete forms)
-    people = [p for p in people
-              if p.row[COL_WANT_TO_BE_MENTOR] == 'Yes']
-    mentors = [Mentor(p) for p in people]
+    mentor_rows = [row for row in rows
+                   if row[COL_WANT_TO_BE_MENTOR] == 'Yes']
+    mentors = [Mentor(mentor_row, orgchart) for mentor_row in mentor_rows]
     mentors = filter_titles(mentors)
     mentors = filter_out_new_employees(mentors)
     mentors = filter_city(mentors, city)
     return mentors
 
 
-def filter_mentees(people, city):
+def filter_mentees(rows, orgchart, city):
     """Accepts a list of all people who filled out form.
       Returns a list of potential mentees after filtering
         out those who don't say yes to the level of work.
     """
     # TODO: write more of this (like filter out non-complete forms)
-    people = [p for p in people
-              if p.row[COL_WANT_TO_BE_MENTEE] == 'Yes']
-    # people = [p for p in people
-    #           if p.row[COL_COMMIT_TO_BE_MENTEE] == 'YES'] # double willing
-
-    mentees = [Mentee(p) for p in people]
+    mentee_rows = [row for row in rows
+                   if row[COL_WANT_TO_BE_MENTEE] == 'Yes']
+    mentees = [Mentee(mentee_row, orgchart) for mentee_row in mentee_rows]
     mentees = filter_titles(mentees)
     mentees = filter_out_new_employees(mentees)
     mentees = filter_city(mentees, city)
@@ -90,9 +87,10 @@ def make_match(mentor, mentees):
 class Person(object):
     skills = []
 
-    def __init__(self, row, family=None):
+    def __init__(self, row, orgchart=None):
         self._row = row
-        self._family = family
+        if orgchart:
+            self._json = orgchart.get(row[COL_EMAIL], None)
 
     @property
     def email(self):
@@ -108,11 +106,11 @@ class Person(object):
 
     @property
     def title(self):
-        return self.family.get('title', 'Not in family')
+        return self.json.get('title', 'Not in orgchart')
 
     @property
     def time_at_lyft(self):
-        start_date = dateutil.parser.parse(self.family.get('start_date', '')).replace(tzinfo=None)
+        start_date = dateutil.parser.parse(self.json.get('start_date', '')).replace(tzinfo=None)
         rd = relativedelta(datetime.datetime.now(), start_date)
         return rd
 
@@ -127,8 +125,8 @@ class Person(object):
         return "%dy %dm" % (rd.years, rd.months)
 
     @property
-    def family(self):
-        return self._family if self._family else {}
+    def json(self):
+        return self._json if self._json else {}
 
     def _parse_skills_str_in_row(self, col_index):
         skills = set(self.row[col_index].split(';'))
@@ -146,9 +144,10 @@ class Person(object):
     def _vectorize_skills(cls, skills_to_vectorize):
         return [(1 if s in skills_to_vectorize else 0) for s in cls.skills]
 
+
 class Mentor(Person):
-    def __init__(self, person):
-        Person.__init__(self, person.row, person.family)
+    def __init__(self, row, orgchart=None):
+        Person.__init__(self, row, orgchart=orgchart)
 
     def is_skills_match_with(self, mentee):
         # TODO: add in most-wanted skill logic from mentee when we have that data
@@ -170,8 +169,8 @@ class Mentor(Person):
 
 
 class Mentee(Person):
-    def __init__(self, person):
-        Person.__init__(self, person.row, person.family)
+    def __init__(self, row, orgchart=None):
+        Person.__init__(self, row, orgchart=orgchart)
 
     def mentee_skills_interests(self):
         skills = self._parse_skills_str_in_row(COL_WANT_SKILLS)
@@ -195,13 +194,14 @@ def sponsor(persons, emails):
     return sponsored + nonsponsored
 
 
-def read_family(filename):
-    family = {}
+def read_orgchart(filename):
+    orgchart = {}
     with open(filename, 'r') as f:
         for line in f:
             p = json.loads(line)
-            family[p['email'].lower()] = p
-    return family
+            orgchart[p['email'].lower()] = p
+    return orgchart
+
 
 def remove_mentor_from_mentees_list(mentor, mentees):
     return [m for m in mentees if m.email != mentor.email]
@@ -217,19 +217,18 @@ def find_all_skills(mentors, mentees):
 
 
 if __name__ == '__main__':
-    family = read_family('all.txt')
+    orgchart = read_orgchart('all.txt')
 
     city = sys.argv[1]
 
     headers = []
-    output = []
+    rows = []
     with open('data.csv', 'rb') as csvfile:
         data = csv.reader(csvfile)
         output = [row for row in data]
-        headers, data = output[0], output[1:]
-        people = [Person(row, family=family.get(row[1])) for row in data]
+        headers, rows = output[0], output[1:]
 
-    mentors, mentees = filter_mentors(people, city), filter_mentees(people, city)
+    mentors, mentees = filter_mentors(rows, orgchart, city), filter_mentees(rows, orgchart, city)
 
     Person.skills = find_all_skills(mentors, mentees)
 
@@ -238,7 +237,7 @@ if __name__ == '__main__':
 
     sponsored_mentors = read_emails('mentors.txt')
     sponsored_mentees = read_emails('mentees.txt')
-    mentors = list(reversed(sponsor(mentors, sponsored_mentors)))
+    mentors = list(reversed(sponsor(mentors, sponsored_mentors))) # pop from bottom
     mentees = sponsor(mentees, sponsored_mentees)
 
     matches = []
