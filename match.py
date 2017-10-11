@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import csv
+import sys
 import random
 import json
 import datetime
@@ -18,17 +19,21 @@ COL_MOST_WANTED_SKILL = 8
 COL_WANT_TO_BE_MENTOR = 9
 COL_CAN_MENTOR_SKILLS = 10
 
+
 def filter_city(persons, city):
     return [p for p in persons if p.city == city]
 
+
 def filter_titles(persons):
     return [p for p in persons
-               if p.title in ('SWE', 'Director, Engineering', 'Data Scientist', 'Engineering Manager')]
+            if p.title in ('SWE', 'Director, Engineering', 'Data Scientist', 'Engineering Manager')]
+
 
 def filter_out_new_employees(persons):
     return [p for p in persons if not p.is_new_employee]
 
-def filter_mentors(people):
+
+def filter_mentors(people, city):
     """Accepts a list of all people who filled out form.
       Returns a list of potential mentors after filtering
         out those who don't want to or don't have skills to.
@@ -39,10 +44,11 @@ def filter_mentors(people):
     mentors = [Mentor(p) for p in people]
     mentors = filter_titles(mentors)
     mentors = filter_out_new_employees(mentors)
-    mentors = filter_city(mentors, 'Seattle')
+    mentors = filter_city(mentors, city)
     return mentors
 
-def filter_mentees(people):
+
+def filter_mentees(people, city):
     """Accepts a list of all people who filled out form.
       Returns a list of potential mentees after filtering
         out those who don't say yes to the level of work.
@@ -50,24 +56,24 @@ def filter_mentees(people):
     # TODO: write more of this (like filter out non-complete forms)
     people = [p for p in people
               if p.row[COL_WANT_TO_BE_MENTEE] == 'Yes']
-    #people = [p for p in people
-    #          if p.row[COL_COMMIT_TO_BE_MENTEE] == 'YES'] # double willing 
+    # people = [p for p in people
+    #           if p.row[COL_COMMIT_TO_BE_MENTEE] == 'YES'] # double willing
 
     mentees = [Mentee(p) for p in people]
     mentees = filter_titles(mentees)
     mentees = filter_out_new_employees(mentees)
-    mentees = filter_city(mentees, 'Seattle')
+    mentees = filter_city(mentees, city)
     return mentees
 
 
 def make_match(mentor, mentees):
     """Accepts a mentor, and a list of possible matches.
-       Returns a 2-tuple of 
+       Returns a 2-tuple of
            1. the match (3-tuple of mentor, mentee, skills list) and
            2. the mentees who were not matched.
     """
-    #TODO: this is greedy; can we optimize an objective function instead?
-    #TODO: use more logic: e.g. increase cross-org matches
+    # TODO: this is greedy; can we optimize an objective function instead?
+    # TODO: use more logic: e.g. increase cross-org matches
     for i, mentee in enumerate(mentees):
         if mentor.is_skills_match_with(mentee):
             match = (mentor, mentee, mentor.skills_to_mentor(mentee))
@@ -121,7 +127,7 @@ class Person(object):
     def _parse_skills_str_in_row(self, col_index):
         skills = set(self.row[col_index].split(';'))
         if '' in skills:
-          skills.remove('')
+            skills.remove('')
         return skills
 
     def __str__(self):
@@ -187,6 +193,8 @@ def read_family(filename):
 if __name__ == '__main__':
     family = read_family('all.txt')
 
+    city = sys.argv[1]
+
     headers = []
     output = []
     with open('data.csv', 'rb') as csvfile:
@@ -195,7 +203,7 @@ if __name__ == '__main__':
         headers, data = output[0], output[1:]
         people = [Person(row, family=family.get(row[1])) for row in data]
 
-    mentors, mentees = filter_mentors(people), filter_mentees(people)
+    mentors, mentees = filter_mentors(people, city), filter_mentees(people, city)
 
     random.shuffle(mentors)
     random.shuffle(mentees)
@@ -216,4 +224,3 @@ if __name__ == '__main__':
 
     for m in matches:
         print m
-
