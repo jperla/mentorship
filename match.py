@@ -293,8 +293,11 @@ if __name__ == '__main__':
 
     for m in matches:
         print m
+    
+    print "\n\nManager Emails:"
+    print ','.join(m[0].email for m in matches)
 
-    print 'Remaining mentees with no mentors:'
+    print "\n\nRemaining mentees with no mentors:"
 
     for m in mentees:
         print m
