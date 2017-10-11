@@ -258,6 +258,9 @@ if __name__ == '__main__':
     orgchart = OrgChart.readfile('all.txt')
 
     city = sys.argv[1]
+    if len(sys.argv) > 2:
+        seed = sys.argv[2]
+        random.seed(seed)
 
     headers = []
     rows = []
