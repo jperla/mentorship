@@ -24,7 +24,10 @@ COL_CAN_MENTOR_SKILLS = 10
 
 def filter_city(persons, city):
     # hack for people who didn't update survey, assume SF
-    return [p for p in persons if (p.city == city or (city == 'SF' and p.city == ''))]
+    return [p for p in persons if (p.city == city or 
+                                   (city == 'SF' and p.office == 'San Francisco') or
+                                   (city == 'Seattle' and p.office == 'Seattle') or
+                                   (city == 'SF' and p.city == '' and p.office == ''))]
 
 
 def filter_office(persons, office):
