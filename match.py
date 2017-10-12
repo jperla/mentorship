@@ -361,9 +361,6 @@ if __name__ == '__main__':
     for m in matches:
         print str(m[0]) + ',' +  str(m[1]) + ',' +  str(m[2]) + ',' +  str(m[3]) + ',' + str(m[4])
     
-    print "\n\nMentor Emails:"
-    print ','.join(m[0].email for m in matches)
-
     print "\n\nRemaining mentees with no mentors:"
 
     for m in mentees:
