@@ -153,6 +153,10 @@ class Person(object):
         return self._managers
 
     @property
+    def manager_email(self):
+        return self._managers[0]['email']
+
+    @property
     def time_at_lyft(self):
         start_date = dateutil.parser.parse(self.json.get('start_date', '')).replace(tzinfo=None)
         rd = relativedelta(datetime.datetime.now(), start_date)
@@ -183,7 +187,7 @@ class Person(object):
         return skills
 
     def __str__(self):
-        return '{0}, ({1} | {2})'.format(self.email, self.title, self.time_at_lyft_str)
+        return '{0}, ({1} | {2}), {3}'.format(self.email, self.title, self.time_at_lyft_str, self.manager_email)
 
     def __repr__(self):
         return self.__str__()
@@ -205,7 +209,7 @@ class Mentor(Person):
     def cosine_similarity_skills_match_with(self, mentee):
         mentor_skills = Person._vectorize_skills(self.mentorable_skills())
         mentee_skills = Person._vectorize_skills(mentee.mentee_skills_interests())
-        return round(spatial.distance.cosine(mentor_skills, mentee_skills), 2)
+        return round(1.0 - spatial.distance.cosine(mentor_skills, mentee_skills), 2)
 
     def skills_to_mentor(self, mentee):
         return self.mentorable_skills().intersection(mentee.mentee_skills_interests())
