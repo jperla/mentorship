@@ -14,12 +14,13 @@ NUM_MONTHS_NEW_EMPLOYEE = 6
 # survey: https://docs.google.com/forms/d/1rHJ1DOLj1tv3eqayjpmR20N8lq87UAI1dCYmv9jUl5E/edit
 COL_EMAIL = 1
 COL_CITY = 2
-COL_WANT_TO_BE_MENTEE = 5
-COL_COMMIT_TO_BE_MENTEE = 6
-COL_WANT_SKILLS = 7
-COL_MOST_WANTED_SKILL = 8
-COL_WANT_TO_BE_MENTOR = 9
-COL_CAN_MENTOR_SKILLS = 10
+COL_YEARS = 3
+COL_WANT_TO_BE_MENTEE = 6
+COL_COMMIT_TO_BE_MENTEE = 7
+COL_WANT_SKILLS = 8
+COL_MOST_WANTED_SKILL = 9
+COL_WANT_TO_BE_MENTOR = 10
+COL_CAN_MENTOR_SKILLS = 11
 
 
 def filter_city(persons, city):
@@ -72,7 +73,7 @@ def filter_mentees(rows, orgchart, city):
 
 def make_match(mentor, mentee):
     match = (mentor, mentee,
-             ', '.join(mentor.skills_to_mentor(mentee)),
+             ' | '.join(mentor.skills_to_mentor(mentee)),
              mentor.manager_delta(mentee),
              mentor.cosine_similarity_skills_match_with(mentee))
     return match
@@ -182,7 +183,7 @@ class Person(object):
         return skills
 
     def __str__(self):
-        return '{0} ({1}, {2})'.format(self.email, self.title, self.time_at_lyft_str)
+        return '{0}, ({1} | {2})'.format(self.email, self.title, self.time_at_lyft_str)
 
     def __repr__(self):
         return self.__str__()
@@ -268,8 +269,8 @@ def sponsor(persons, emails):
     return sponsored + nonsponsored
 
 
-def remove_person_from_list(mentor, mentees):
-    return [m for m in mentees if m.email != mentor.email]
+def remove_person_from_list(person, list_of_people):
+    return [p for p in list_of_people if p.email != person.email]
 
 
 def find_all_skills(mentors, mentees):
@@ -342,6 +343,7 @@ if __name__ == '__main__':
                 mentors = remove_person_from_list(mentor, mentors)
                 mentees = remove_person_from_list(mentor, mentees)
                 mentees = remove_person_from_list(mentee, mentees)
+                mentors = remove_person_from_list(mentee, mentors)
 
     while len(mentors) > 0:
         mentor_to_match = mentors.pop()
@@ -353,7 +355,7 @@ if __name__ == '__main__':
             print 'No mentees found for %s' % mentor_to_match
 
     for m in matches:
-        print m
+        print str(m[0]) + ',' +  str(m[1]) + ',' +  str(m[2]) + ',' +  str(m[3]) + ',' + str(m[4])
     
     print "\n\nMentor Emails:"
     print ','.join(m[0].email for m in matches)
